@@ -1,4 +1,7 @@
 import pygame
+from pathfinding.core.grid import Grid
+from pathfinding.finder.a_star import AStarFinder
+from pathfinding.core.diagonal_movement import DiagonalMovement
 
 from settings import *
 from supports import *
@@ -17,11 +20,12 @@ class Level:
         # Player setup
         self.player = pygame.sprite.GroupSingle()
         self.nucleus = pygame.sprite.GroupSingle()
+        self.setup_player(import_csv_layout(self.level_data['player']))
 
         # Terrain setup
-        # self.shadow_tile = self.create_tile_group(
-        #     import_csv_layout(self.level_data['shadow']), 'shadow')
-        self.wall_tile = self.create_tile_group(
+        self.shadow_tile = self.create_tile_group(
+            import_csv_layout(self.level_data['shadow']), 'shadow')
+        self.wall_tiles = self.create_tile_group(
             import_csv_layout(self.level_data['wall']), 'wall')
         ground_layout = import_csv_layout(self.level_data['ground'])
         self.ground_tile = self.create_tile_group(ground_layout, 'ground')
@@ -31,7 +35,9 @@ class Level:
         total_level_height = len(ground_layout) * TILE_SIZE
         self.camera = Camera(total_level_width, total_level_height)
 
-        self.setup_player(import_csv_layout(self.level_data['player']))
+        # Light effect
+        self.black_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.black_surface.fill("black")
 
     def create_tile_group(self, layout, type):
         sprite_group = pygame.sprite.Group()
@@ -43,14 +49,19 @@ class Level:
                     y = row_index * TILE_SIZE
 
                     if type == 'wall':
-                        wall_tile_list = import_cut_graphics(
+                        wall_tiles_list = import_cut_graphics(
                             'graphics/terrain/wall.png')
-                        tile_surface = wall_tile_list[int(val)]
+                        tile_surface = wall_tiles_list[int(val)]
                         sprite = StaticTile(TILE_SIZE, x, y, tile_surface)
                     elif type == 'ground':
                         ground_tile_list = import_cut_graphics(
                             'graphics/terrain/ground.png')
                         tile_surface = ground_tile_list[int(val)]
+                        sprite = StaticTile(TILE_SIZE, x, y, tile_surface)
+                    elif type == 'shadow':
+                        shadow_tile_list = import_cut_graphics(
+                            'graphics/terrain/shadow.png')
+                        tile_surface = shadow_tile_list[int(val)]
                         sprite = StaticTile(TILE_SIZE, x, y, tile_surface)
 
                     sprite_group.add(sprite)
@@ -69,13 +80,41 @@ class Level:
                     sprite = Tile(TILE_SIZE, x, y, 'yellow')
                     self.nucleus.add(sprite)
 
-    def apply_horizontal_movement(self):
+    def player_collision(self, tiles):
         player = self.player.sprite
-        player.rect.x = player.direction.x * player.speed
+        player.rect.centerx += player.direction.x * player.speed
+        player.rect.centery += player.direction.y * player.speed
 
-    def apply_vertical_movement(self):
-        player = self.player.sprite
-        player.rect.y = player.direction.y * player.speed
+        for tile in tiles.sprites():
+            if tile.rect.colliderect(player.rect):
+                if player.direction.y > 0:
+                    player.rect.bottom = tile.rect.top
+                    player.direction.y = 0
+                elif player.direction.y < 0:
+                    player.rect.top = tile.rect.bottom
+                    player.direction.y = 0
+
+                if player.direction.x < 0:
+                    player.rect.left = tile.rect.right
+                    player.direction.x = 0
+                elif player.direction.x > 0:
+                    player.rect.right = tile.rect.left
+                    player.direction.x = 0
+
+                if player.direction.x < 0 and player.direction.y > 0 or player.direction.x > 0 and player.direction.y < 0 or player.direction.x > 0 and player.direction.y > 0 or player.direction.x < 0 and player.direction.y < 0:
+                    player.direction.y = 0
+                    player.direction.x = 0
+
+    def render_light(self):
+        light_mask = self.player.sprite.light_mask
+        light_rect = self.player.sprite.light_rect
+
+        self.black_surface.fill('black')
+        light_rect.center = self.camera.apply(self.player.sprite).center
+
+        self.black_surface.blit(light_mask, light_rect)
+        self.display_surface.blit(
+            self.black_surface, (0, 0), special_flags=pygame.BLEND_MULT)
 
     def run(self):
         self.camera.update(self.player.sprite)
@@ -83,14 +122,20 @@ class Level:
         # Terrain
         for tile in self.ground_tile:
             self.display_surface.blit(tile.image, self.camera.apply(tile))
-        for tile in self.wall_tile:
+        self.ground_tile.update()
+        for tile in self.wall_tiles:
             self.display_surface.blit(tile.image, self.camera.apply(tile))
 
         # Player
         self.player.update()
-        self.apply_horizontal_movement()
-        self.apply_vertical_movement()
+        self.player_collision(self.wall_tiles)
         for sprite in self.player:
             self.display_surface.blit(sprite.image, self.camera.apply(sprite))
         for sprite in self.nucleus:
             self.display_surface.blit(sprite.image, self.camera.apply(sprite))
+
+        self.render_light()
+
+        # Shadow
+        # for tile in self.shadow_tile:
+        #     self.display_surface.blit(tile.image, self.camera.apply(tile))

@@ -4,25 +4,28 @@ import sys
 from settings import *
 from level import Level
 from menu import *
+from ui import UI
 
 
 # Game class
 class Game:
     def __init__(self):
-        self.status = 'level'
+        self.status = 'menu'
         self.level = Level(screen)
+        self.menu = Menu(screen, "The nucleus of the cell",
+                         [
+                             Button(screen, self.create_level,
+                                    "Start", 200, 50),
+                             Button(screen, self.create_level,
+                                    "Settings", 200, 50),
+                             Button(screen, self.create_level,
+                                    "Credits", 200, 50),
+                             Button(screen, self.quit,
+                                    "Quit", 200, 50),
+                         ])
 
-        # self.menu = Menu(screen, "Game Name",
-        #                  [
-        #                      Button(screen, self.create_level,
-        #                             "Start", 200, 50),
-        #                      Button(screen, self.create_level,
-        #                             "Settings", 200, 50),
-        #                      Button(screen, self.create_level,
-        #                             "Credits", 200, 50),
-        #                      Button(screen, self.create_level,
-        #                             "Quit", 200, 50),
-        #                  ])
+        # UI
+        self.ui = UI(screen)
 
     def create_menu(self):
         self.status = 'menu'
@@ -34,7 +37,7 @@ class Game:
                                     "Settings", 200, 50),
                              Button(screen, self.create_level,
                                     "Credits", 200, 50),
-                             Button(screen, self.create_level,
+                             Button(screen, self.quit,
                                     "Quit", 200, 50),
                          ])
 
@@ -51,9 +54,10 @@ class Game:
             self.menu.run()
         else:
             self.level.run()
+            self.ui.show()
 
 
-        # Setup
+# Setup
 pygame.init()
 
 pygame.display.set_caption("The nucleus of the cell")
